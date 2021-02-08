@@ -27,6 +27,11 @@ static bool gbs_mode;
 
 static int regs[0x100];
 
+typedef std::map<std::vector<unsigned char>, Location> SampleLocations;
+static SampleLocations sample_locations;
+
+static std::deque<unsigned int> sample_buffer;
+
 #define LYC             0
 #define SAMPLE          1
 #define STOP            2
@@ -54,6 +59,8 @@ static void reset() {
     song_locations.clear();
     music_stream.clear();
     memset(regs, -1, sizeof(regs));
+    sample_locations.clear();
+    sample_buffer.clear();
     write_location.bank = 0;
     write_location.ptr = 0;
     fclose(f);
@@ -172,6 +179,10 @@ static void fprint_cmd_comment(FILE* f, unsigned int cmd) {
             fprintf(f, "noi trig");
             break;
 
+        case 0x25:
+            fprintf(f, "pan");
+            break;
+
         default:
             fprintf(f, "%x", cmd & 0x7f);
     }
@@ -190,8 +201,6 @@ static void write_byte(unsigned int byte) {
     ++write_location.ptr;
     assert(write_location.ptr < 0x8000);
 }
-
-static std::deque<unsigned int> sample_buffer;
 
 static bool sample_buffer_full() {
     return sample_buffer.size() == 44;
@@ -383,9 +392,6 @@ static void optimize_envelope() {
     sample_buffer.push_back(byte);
 }
 
-typedef std::map<std::vector<unsigned char>, Location> SampleLocations;
-static SampleLocations sample_locations;
-
 static void write_sample_buffer() {
     std::vector<unsigned char> sample_contents;
     for (int i = 5; i < 5 + 32; i += 2) {
@@ -402,14 +408,16 @@ static void write_sample_buffer() {
 #endif
         }
     }
-    music_stream.push_back(SAMPLE | CMD_FLAG);
-    assert(sample_location->second.bank < 0x100);
-    music_stream.push_back(sample_location->second.bank);
-    music_stream.push_back(sample_location->second.ptr & 0xff);
-    music_stream.push_back(sample_location->second.ptr >> 8);
-    music_stream.push_back(sample_buffer[39]); // freq
-    music_stream.push_back(sample_buffer[41]); // freq
+    int pitch_lsb = sample_buffer[39];
+    int pitch_msb = sample_buffer[41];
     sample_buffer.clear();
+    sample_buffer.push_back(SAMPLE | CMD_FLAG);
+    assert(sample_location->second.bank < 0x100);
+    sample_buffer.push_back(sample_location->second.bank);
+    sample_buffer.push_back(sample_location->second.ptr & 0xff);
+    sample_buffer.push_back(sample_location->second.ptr >> 8);
+    sample_buffer.push_back(pitch_lsb); // freq
+    sample_buffer.push_back(pitch_msb); // freq
 }
 
 static void flush_sample_buffer() {
