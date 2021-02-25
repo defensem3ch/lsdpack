@@ -16,41 +16,21 @@
    with this program; if not, write to the Free Software Foundation, Inc.,
    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. }}} */
 
-#include "getopt.h"
+#include "rule.h"
 
-#include <cstdio>
+class PitchRule : public Rule {
+    private:
+        unsigned int pu0_lsb_state;
+        unsigned int pu0_msb_state;
+        unsigned int pu1_lsb_state;
+        unsigned int pu1_msb_state;
+        unsigned int wav_lsb_state;
+        unsigned int wav_msb_state;
 
-const char* optarg;
-int optind = 1;
+    public:
+        PitchRule();
 
-int getopt(int argc, char* const argv[], const char *optstring) {
-    if (optind >= argc) {
-        return -1;
-    }
+        size_t window_size() const override { return 4; }
 
-    const char dash = argv[optind][0];
-    if (dash != '-') {
-        return -1;
-    }
-
-    int optchar = argv[optind][1];
-    while (*optstring) {
-        if (*optstring == optchar) {
-            ++optind;
-            if (optstring[1] == ':') {
-                if (optind >= argc) {
-                    fprintf(stderr, "Missing argument for -%c\n", optchar);
-                    return -1;
-                }
-                // Read option argument.
-                optarg = argv[optind];
-                ++optind;
-            }
-            return optchar;
-        }
-        ++optstring;
-    }
-
-    ++optind;
-    return optchar;
-}
+        void transform(std::deque<unsigned int>& bytes) override;
+};

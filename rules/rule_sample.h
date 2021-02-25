@@ -16,54 +16,41 @@
    with this program; if not, write to the Free Software Foundation, Inc.,
    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. }}} */
 
+#pragma once
+
+#include <map>
 #include <vector>
 
-#include "rules/rule_sample.h"
+#include "rule.h"
 
-class Rule;
-
-class Writer {
-    public:
-        explicit Writer(bool gbs_mode);
-
-        void record_song_start(const char* out_path);
-        void record_song_stop();
-        void record_write(unsigned char addr, unsigned char data);
-        void record_lcd();
-        void write_music_to_disk();
-
-        static void disable_optimizations();
-
+class SampleRule : public Rule {
     private:
-        void write_song_locations();
-        void optimize_rule(Rule& rule);
-        void optimize_music_stream();
-
-        FILE* f;
-
-        const bool gbs_mode;
-
         struct Location {
             Location() : bank(0), ptr(0) {}
             int bank;
             int ptr;
         };
+
+        typedef std::map<std::vector<unsigned char>, Location> SampleLocations;
+        SampleLocations sample_locations;
+
+        int sample_count;
+        int curr_sample_bank;
+        int curr_sample_address;
+
+        unsigned int pitch_lsb_state;
+        unsigned int pitch_msb_state;
+
         Location write_location;
 
-        unsigned int regs[0x100];
+        std::vector<unsigned char> all_samples;
 
-        std::vector<Location> song_locations;
-        std::vector<unsigned int> music_stream;
+    public:
+        SampleRule();
 
-        int last_music_size;
+        std::vector<unsigned char> get_samples() { return all_samples; }
 
-        SampleRule sample_rule;
+        size_t window_size() const override { return 44; }
 
-        // -----
-
-        void new_bank();
-        void write_byte(unsigned int byte);
-        void record_byte(unsigned int byte);
-        void write_samples();
-        void insert_new_bank_cmds();
+        void transform(std::deque<unsigned int>& bytes) override;
 };

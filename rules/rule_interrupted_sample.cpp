@@ -16,41 +16,30 @@
    with this program; if not, write to the Free Software Foundation, Inc.,
    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. }}} */
 
-#include "getopt.h"
+#include "rule_interrupted_sample.h"
 
-#include <cstdio>
+#include <cassert>
 
-const char* optarg;
-int optind = 1;
+void InterruptedSampleRule::transform(std::deque<unsigned int>& bytes) {
+    const bool interrupted_sample =
+        (bytes[0] == (0x25 | FLAG_CMD) && bytes[4] == (0x30 | FLAG_CMD) && bytes[43] == (0x25 | FLAG_CMD)) ||
+        (bytes[0] == (0x25 | FLAG_CMD) && bytes[5] == (0x30 | FLAG_CMD) && bytes[43] == (0x25 | FLAG_CMD));
 
-int getopt(int argc, char* const argv[], const char *optstring) {
-    if (optind >= argc) {
-        return -1;
+    if (!interrupted_sample) {
+        return;
     }
 
-    const char dash = argv[optind][0];
-    if (dash != '-') {
-        return -1;
-    }
-
-    int optchar = argv[optind][1];
-    while (*optstring) {
-        if (*optstring == optchar) {
-            ++optind;
-            if (optstring[1] == ':') {
-                if (optind >= argc) {
-                    fprintf(stderr, "Missing argument for -%c\n", optchar);
-                    return -1;
-                }
-                // Read option argument.
-                optarg = argv[optind];
-                ++optind;
-            }
-            return optchar;
+    size_t i = 0;
+    while (i < bytes.size()) {
+        if (bytes[i] == (CMD_END_TICK | FLAG_CMD)) {
+            break;
         }
-        ++optstring;
+        ++i;
     }
-
-    ++optind;
-    return optchar;
+    assert(i != bytes.size());
+    while (i < bytes.size() - 1) {
+        bytes[i] = bytes[i + 1];
+        ++i;
+    }
+    bytes[i] = (CMD_END_TICK | FLAG_CMD);
 }

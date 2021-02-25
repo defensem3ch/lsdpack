@@ -1,9 +1,27 @@
+/* lsdpack - standalone LSDj (Little Sound Dj) recorder + player {{{
+   Copyright (C) 2018  Johan Kotlinski
+   https://www.littlesounddj.com
+
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 2 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License along
+   with this program; if not, write to the Free Software Foundation, Inc.,
+   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. }}} */
+
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include "getopt.h"
 
-#define PLAYER_ADDRESS 0x3e00
+#define PLAYER_ADDRESS 0x3d00
 
 void verify(FILE* f, const char* path) {
     if (f != 0) {
@@ -24,7 +42,7 @@ std::string copyright = "<Copyright>";
 
 void fputs_padded(const char* s, FILE* f) {
     if (strlen(s) > 32) {
-        fprintf(stderr, "'%s' too long, max 32 characters", s);
+        fprintf(stderr, "'%s' too long, max 32 characters\n", s);
         exit(1);
     }
     fputs(s, f);
@@ -67,6 +85,11 @@ void write_gbs_header(FILE* f) {
     fputs_padded(copyright.c_str(), f);
 }
 
+void print_help_and_exit() {
+    fprintf(stderr, "usage: makegbs [-t <title>] [-a <artist>] [-c <copyright>] player.gb\n");
+    exit(1);
+}
+
 int main(int argc, char* argv[]) {
     int c;
     while ((c = getopt(argc, argv, "t:c:a:")) != -1) {
@@ -80,12 +103,13 @@ int main(int argc, char* argv[]) {
             case 'c':
                 copyright = optarg;
                 break;
+            default:
+                print_help_and_exit();
         }
     }
 
     if (optind != argc - 1) {
-        fprintf(stderr, "usage: makegbs [-a <artist>] [-t <title>] [-c <copyright>] player.gb");
-        return 1;
+        print_help_and_exit();
     }
 
     std::string gbs_path = argv[optind];
@@ -102,7 +126,7 @@ int main(int argc, char* argv[]) {
     fseek(gb_f, PLAYER_ADDRESS, SEEK_SET);
 
     while (true) {
-        int c = fgetc(gb_f);
+        c = fgetc(gb_f);
         if (c == EOF) {
             break;
         }

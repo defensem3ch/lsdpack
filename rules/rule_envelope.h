@@ -16,41 +16,17 @@
    with this program; if not, write to the Free Software Foundation, Inc.,
    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. }}} */
 
-#include "getopt.h"
+#include "rule.h"
 
-#include <cstdio>
+class EnvelopeRule : public Rule {
+    public:
+        size_t window_size() const override { return 15 * 2; }
 
-const char* optarg;
-int optind = 1;
-
-int getopt(int argc, char* const argv[], const char *optstring) {
-    if (optind >= argc) {
-        return -1;
-    }
-
-    const char dash = argv[optind][0];
-    if (dash != '-') {
-        return -1;
-    }
-
-    int optchar = argv[optind][1];
-    while (*optstring) {
-        if (*optstring == optchar) {
-            ++optind;
-            if (optstring[1] == ':') {
-                if (optind >= argc) {
-                    fprintf(stderr, "Missing argument for -%c\n", optchar);
-                    return -1;
-                }
-                // Read option argument.
-                optarg = argv[optind];
-                ++optind;
-            }
-            return optchar;
-        }
-        ++optstring;
-    }
-
-    ++optind;
-    return optchar;
-}
+        /* LSDj 8.8.0+ soft envelope problem:
+         * To decrease volume on CGB, the byte 8 is written 15 times to
+         * either of addresses 0xff12, 0xff17 or 0xff21.
+         * To improve sound on DMG and reduce ROM/CPU usage, replace this
+         * with commands AMP_DOWN_XXX
+         */
+        void transform(std::deque<unsigned int>& bytes) override;
+};

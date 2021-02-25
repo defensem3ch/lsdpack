@@ -16,41 +16,36 @@
    with this program; if not, write to the Free Software Foundation, Inc.,
    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. }}} */
 
-#include "getopt.h"
+#include "rule.h"
 
-#include <cstdio>
+class LycRule : public Rule {
+    public:
+        size_t window_size() const override { return 8; }
 
-const char* optarg;
-int optind = 1;
-
-int getopt(int argc, char* const argv[], const char *optstring) {
-    if (optind >= argc) {
-        return -1;
-    }
-
-    const char dash = argv[optind][0];
-    if (dash != '-') {
-        return -1;
-    }
-
-    int optchar = argv[optind][1];
-    while (*optstring) {
-        if (*optstring == optchar) {
-            ++optind;
-            if (optstring[1] == ':') {
-                if (optind >= argc) {
-                    fprintf(stderr, "Missing argument for -%c\n", optchar);
-                    return -1;
-                }
-                // Read option argument.
-                optarg = argv[optind];
-                ++optind;
+        // CMD:*:LYC => CMD|0x80:*
+        void transform(std::deque<unsigned int>& bytes) override {
+            if (bytes[7] != (FLAG_CMD | CMD_END_TICK)) {
+                return;
             }
-            return optchar;
-        }
-        ++optstring;
-    }
 
-    ++optind;
-    return optchar;
-}
+            int i;
+            for (i = 6; i >= 0; --i) {
+                if (bytes[i] & FLAG_CMD) {
+                    break;
+                }
+            }
+            if (i == -1) {
+                return;
+            }
+
+            if (bytes[i] == (FLAG_CMD | CMD_END_TICK)) {
+                return;
+            }
+            if (bytes[i] & FLAG_END_TICK) {
+                return;
+            }
+
+            bytes[i] |= FLAG_END_TICK;
+            bytes.resize(7);
+        }
+};

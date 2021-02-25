@@ -1,9 +1,20 @@
 cmake_minimum_required (VERSION 3.1)
 project (lsdpack)
 
-if (CMAKE_COMPILER_IS_GNUCXX)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -O2")
+set(CPACK_PACKAGE_VENDOR "Johan Kotlinski")
+set(CPACK_PACKAGE_VERSION_MAJOR 0)
+set(CPACK_PACKAGE_VERSION_MINOR 0)
+set(CPACK_PACKAGE_VERSION_PATCH 4)
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE.txt")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_SOURCE_DIR}/README.md")
+if(MSVC)
+    set(CPACK_GENERATOR "ZIP")
 endif()
+install(FILES
+    ${CPACK_RESOURCE_FILE_LICENSE}
+    ${CPACK_RESOURCE_FILE_README}
+    DESTINATION .)
+include (CPack)
 
 add_definitions(-DHAVE_STDINT_H)
 
@@ -16,8 +27,13 @@ include_directories(
 add_executable(lsdpack
 
     lsdpack.cpp
-    writer.cpp
     getopt.cpp
+    writer.cpp
+    rules/rule_envelope.cpp
+    rules/rule_pitch.cpp
+    rules/rule_sample.cpp
+    rules/rule_interrupted_sample.cpp
+    rules/rule_repeat_command.cpp
 
     libgambatte/src/bitmap_font.cpp
     libgambatte/src/cpu.cpp
@@ -51,4 +67,15 @@ add_executable(lsdpack
 
 add_executable(makegbs makegbs.cpp getopt.cpp)
 
-set_property(TARGET lsdpack PROPERTY CXX_STANDARD 98)
+get_directory_property(TARGET_NAMES BUILDSYSTEM_TARGETS)
+
+install(TARGETS ${TARGET_NAMES})
+
+foreach(TARGET_NAME ${TARGET_NAMES})
+    set_property(TARGET ${TARGET_NAME} PROPERTY CXX_STANDARD 14)
+    if(MSVC)
+        target_compile_options(${TARGET_NAME} PRIVATE /W4)
+    else()
+        target_compile_options(${TARGET_NAME} PRIVATE -Wall -Wextra -pedantic)
+    endif()
+endforeach()

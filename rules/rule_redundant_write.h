@@ -16,41 +16,29 @@
    with this program; if not, write to the Free Software Foundation, Inc.,
    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. }}} */
 
-#include "getopt.h"
+#include "rule.h"
 
-#include <cstdio>
+#include <cstring>
 
-const char* optarg;
-int optind = 1;
+class RedundantWriteRule : public Rule {
+    public:
+        explicit RedundantWriteRule(unsigned int reg) : reg(reg), reg_state(-1) { }
 
-int getopt(int argc, char* const argv[], const char *optstring) {
-    if (optind >= argc) {
-        return -1;
-    }
+        size_t window_size() const override { return 2; }
 
-    const char dash = argv[optind][0];
-    if (dash != '-') {
-        return -1;
-    }
-
-    int optchar = argv[optind][1];
-    while (*optstring) {
-        if (*optstring == optchar) {
-            ++optind;
-            if (optstring[1] == ':') {
-                if (optind >= argc) {
-                    fprintf(stderr, "Missing argument for -%c\n", optchar);
-                    return -1;
-                }
-                // Read option argument.
-                optarg = argv[optind];
-                ++optind;
+        void transform(std::deque<unsigned int>& bytes) override {
+            if (bytes[0] != (reg | FLAG_CMD)) {
+                return;
             }
-            return optchar;
-        }
-        ++optstring;
-    }
 
-    ++optind;
-    return optchar;
-}
+            if (bytes[1] == reg_state) {
+                bytes.clear();
+            } else {
+                reg_state = bytes[1];
+            }
+        }
+
+    private:
+        unsigned int reg;
+        unsigned int reg_state;
+};

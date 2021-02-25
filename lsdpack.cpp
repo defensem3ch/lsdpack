@@ -1,3 +1,21 @@
+/* lsdpack - standalone LSDj (Little Sound Dj) recorder + player {{{
+   Copyright (C) 2018  Johan Kotlinski
+   https://www.littlesounddj.com
+
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 2 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License along
+   with this program; if not, write to the Free Software Foundation, Inc.,
+   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. }}} */
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -8,10 +26,11 @@
 #include "writer.h"
 #include "getopt.h"
 
-int written_songs;
 gambatte::GB gameboy;
 Input input;
 std::string out_path;
+
+Writer* writer;
 
 void run_one_frame() {
     size_t samples = 35112;
@@ -58,7 +77,6 @@ bool load_song(int position) {
     if (gameboy.isSongEmpty()) {
         return false;
     }
-    printf("Song %i...\n", ++written_songs);
     return true;
 }
 
@@ -68,12 +86,12 @@ void play_song() {
     int seconds_elapsed = 0;
     sound_enabled = false;
     input.press(START);
-    record_song_start(out_path.c_str());
+    writer->record_song_start(out_path.c_str());
     do {
         wait(1);
 
         if (++seconds_elapsed == 60 * 60) {
-            fputs("Aborted: Song still playing after one hour. Please add a HFF command to song end to stop recording.", stderr);
+            fputs("Aborted: Song still playing after one hour. Please add a HFF command to song end to stop recording.\n", stderr);
             exit(1);
         }
     } while(sound_enabled);
@@ -86,7 +104,7 @@ void on_ff_write(char p, char data) {
     switch (p) {
         case 0x26:
             if (sound_enabled && !data) {
-                record_song_stop();
+                writer->record_song_stop();
                 sound_enabled = false;
                 return;
             }
@@ -94,17 +112,21 @@ void on_ff_write(char p, char data) {
             break;
     }
     if (sound_enabled) {
-        record_write(p, data);
+        writer->record_write(p, data);
     }
 }
 
 void on_lcd_interrupt() {
     if (sound_enabled) {
-        record_lcd();
+        writer->record_lcd();
     }
 }
 
 void make_out_path(const char* in_path, std::string suffix) {
+    if (strlen(in_path) < strlen("a.gb")) {
+        return;
+    }
+
     out_path = in_path;
     // .gb => .s
     out_path.replace(out_path.end() - 2, out_path.end(), "s");
@@ -114,67 +136,93 @@ void make_out_path(const char* in_path, std::string suffix) {
     printf("Recording to '%s'\n", out_path.c_str());
 }
 
+void load_gb(const char* path) {
+    if (gameboy.load(path)) {
+        fprintf(stderr, "Loading %s failed\n", path);
+        exit(1);
+    }
+    printf("Loaded %s\n", path);
+    press(0, 3);
+}
+
 void record_gb(int argc, char* argv[]) {
     make_out_path(argv[optind], "");
-    for (; optind < argc; ++optind) {
-        printf("Loading %s...\n", argv[optind]);
-        gameboy.load(argv[optind]);
-        press(0, 3);
+    writer = new Writer(false);
 
-        int song_index = 0;
-        while (load_song(song_index++)) {
-            play_song();
+    for (; optind < argc; ++optind) {
+        load_gb(argv[optind]);
+
+        for (int song_index = 0; song_index < 32; ++song_index) {
+            if (load_song(song_index)) {
+                printf("Playing song %i...\n", song_index + 1);
+                play_song();
+            }
         }
     }
-    write_music_to_disk();
+    writer->write_music_to_disk();
+
+    delete writer;
 }
 
 void record_gbs(int argc, char* argv[]) {
     for (; optind < argc; ++optind) {
-        printf("Loading %s...\n", argv[optind]);
+        load_gb(argv[optind]);
 
-        int song_index = 0;
-        while (true) {
-            gameboy.load(argv[optind]);
-            press(0, 3);
+        for (int song_index = 0; song_index < 32; ++song_index) {
+            writer = new Writer(true);
 
-            if (!load_song(song_index++)) {
-                break;
+            if (load_song(song_index)) {
+                printf("Playing song %i...\n", song_index + 1);
+
+                char suffix[20];
+                snprintf(suffix, sizeof(suffix), "-%i", song_index + 1);
+                make_out_path(argv[optind], suffix);
+
+                play_song();
+                writer->write_music_to_disk();
             }
 
-            char suffix[20];
-            snprintf(suffix, sizeof(suffix), "-%i", song_index);
-            make_out_path(argv[optind], suffix);
-
-            play_song();
-            write_music_to_disk();
+            delete writer;
         }
     }
 }
 
+void print_help_and_exit() {
+    puts("usage: lsdpack [-g] [-r] [lsdj.gb lsdj2.gb ...]");
+    puts("");
+    puts("-g: .gbs conversion");
+    puts("-r: raw register writes; optimizations disabled");
+    exit(1);
+}
+
 int main(int argc, char* argv[]) {
-    bool gbs = false;
+    bool gbs_mode = false;
+
     int c;
-    while ((c = getopt(argc, argv, "g")) != -1) {
+    while ((c = getopt(argc, argv, "gr")) != -1) {
         switch (c) {
             case 'g':
                 puts(".gbs mode enabled");
-                gbs = true;
-                enable_gbs_mode();
+                gbs_mode = true;
                 break;
+            case 'r':
+                puts("disabled optimizations");
+                Writer::disable_optimizations();
+                break;
+            default:
+                print_help_and_exit();
         }
     }
 
     if (argc <= optind) {
-        fprintf(stderr, "usage: lsdpack [-g] [lsdj.gb lsdj2.gb ...]");
-        return 1;
+        print_help_and_exit();
     }
 
     gameboy.setInputGetter(&input);
     gameboy.setWriteHandler(on_ff_write);
     gameboy.setLcdHandler(on_lcd_interrupt);
 
-    if (gbs) {
+    if (gbs_mode) {
         record_gbs(argc, argv);
     } else {
         record_gb(argc, argv);

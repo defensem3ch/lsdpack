@@ -16,41 +16,34 @@
    with this program; if not, write to the Free Software Foundation, Inc.,
    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. }}} */
 
-#include "getopt.h"
+#pragma once
 
 #include <cstdio>
+#include <deque>
 
-const char* optarg;
-int optind = 1;
+enum Cmds {
+    CMD_END_TICK,
+    CMD_SAMPLE_START,
+    CMD_SONG_STOP,
+    CMD_NEXT_BANK,
+    CMD_AMP_DEC_PU0,
+    CMD_AMP_DEC_PU1,
+    CMD_AMP_DEC_NOI,
+    CMD_PITCH_PU0,
+    CMD_PITCH_PU1,
+    CMD_PITCH_WAV,
+    CMD_SAMPLE_NEXT
+};
 
-int getopt(int argc, char* const argv[], const char *optstring) {
-    if (optind >= argc) {
-        return -1;
-    }
+enum Flags {
+    FLAG_END_TICK   = 0x80,
+    FLAG_REPEAT     = 0x40,
+    FLAG_SONG_START = 0x100,
+    FLAG_CMD        = 0x200
+};
 
-    const char dash = argv[optind][0];
-    if (dash != '-') {
-        return -1;
-    }
-
-    int optchar = argv[optind][1];
-    while (*optstring) {
-        if (*optstring == optchar) {
-            ++optind;
-            if (optstring[1] == ':') {
-                if (optind >= argc) {
-                    fprintf(stderr, "Missing argument for -%c\n", optchar);
-                    return -1;
-                }
-                // Read option argument.
-                optarg = argv[optind];
-                ++optind;
-            }
-            return optchar;
-        }
-        ++optstring;
-    }
-
-    ++optind;
-    return optchar;
-}
+class Rule {
+    public:
+        virtual size_t window_size() const = 0;
+        virtual void transform(std::deque<unsigned int>& bytes) = 0;
+};
