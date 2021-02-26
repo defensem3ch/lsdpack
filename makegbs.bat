@@ -17,20 +17,24 @@ if [%1]==[] (
  echo Compiling song from !lsdj!
  if exist !lsdj!*s rm !lsdj!*s
 )
-set sav=!lsdj:.gb=.sav!
-set rom=!lsdj:.gb=!
+set sav=%lsdj:.gb=.sav%
+echo %sav%
+set rom=%lsdj:.gb=%
+echo %rom%
 if not exist !sav! (echo Please place %1 and !sav! in this folder && goto end)
 if not exist player.o (rgbasm.exe -o player.o player.s)
 !lsdpack! -g %1
-for /f "delims=" %%c in ('dir /b !rom!*.s') do (
- set in=%%c%
- set out=!in:.s=.o!
- rgbasm -o !out! !in!
+for /f "delims=" %%c in ('dir /b %rom%*.s') do (
+ echo %%~nc%
+ set out=%%~nc%.o
+ echo !out!
+ rgbasm -o !out! %%c%
 )
-for /f "delims=" %%d in ('dir /b !rom!*.o') do (
- set in=%%d%
- set out=!in:.o=!
- rgblink -o !out!-player.gb player.o !in!
+for /f "delims=" %%d in ('dir /b %rom%*.o') do (
+ echo %%~nd%
+ set out=%%~nd%
+ echo !out!
+ rgblink -o !out!-gbs.gb player.o %%d%
 )
-for /f "delims=" %%e in ('dir /b *-player.gb') do !makegbs! %%e
+for /f "delims=" %%e in ('dir /b *-gbs.gb') do !makegbs! %%e%
 :end
