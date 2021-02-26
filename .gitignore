@@ -4,9 +4,14 @@ CPackConfig.cmake
 CPackSourceConfig.cmake
 Makefile
 cmake_install.cmake
+*.exe
 lsdpack.exe
 *.gb
+*.gbs
 *.sav
 *.o
+*.s
+*.zip
+*.lsdsng
 music.s
 tags
