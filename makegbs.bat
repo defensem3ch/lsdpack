@@ -30,5 +30,10 @@ for /f "delims=" %%d in ('dir /b %rom%*.o') do (
  set out=%%~nd%
  rgblink -o !out!-gbs.gb player.o %%d%
 )
-for /f "delims=" %%e in ('dir /b *-gbs.gb') do !makegbs! %%e%
+for /f "delims=" %%e in ('dir /b *-gbs.gb') do (
+ set /p title=Enter song Title: 
+ set /p artist=Enter song Artist: 
+ set /p copyright=Enter song Copyright: 
+ !makegbs! -t "!title!" -a "!artist!" -c "!copyright!" %%e%
+ )
 :end
